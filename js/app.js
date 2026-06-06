@@ -1,7 +1,7 @@
 // app.js — نقطة الدخول: إدارة الحالة وربط الواجهة بمحرّك الرسم والتصدير.
 
 import { PRESETS, GROUPS, presetById } from './presets.js';
-import { THEMES, themeById } from './themes.js';
+import { THEMES, themeById, makeCustomTheme } from './themes.js';
 import { LAYOUTS } from './layouts.js';
 import { render, loadImage, fileToDataURL, ensureFontsReady } from './renderer.js';
 import { exportAll, exportSingle } from './export.js';
@@ -9,13 +9,14 @@ import { exportAll, exportSingle } from './export.js';
 // ---------- الحالة ----------
 // كل سكرينشوت له إعداداته الخاصة (عنوان/ثيم/تخطيط) ليختلف عن بقية الصفحات.
 const state = {
-  shots: [], // [{ name, img, title, themeId, layoutId }]
-  defaults: { title: '', themeId: 'brown', layoutId: LAYOUTS[0].id },
+  shots: [], // [{ name, img, title, themeId, layoutId, customColor }]
+  defaults: { title: '', themeId: 'brown', layoutId: LAYOUTS[0].id, customColor: '#6F008A' },
   logo: null,
   platform: 'ios',          // مشترك للدفعة
   statusBarRatio: 0.12,     // مشترك (تغطية شريط الحالة)
   showFrame: true,          // مشترك
   iconThemeId: 'purple',    // خلفية الأيقونات/الكفر (منفصلة عن الصور الوصفية)
+  iconCustomColor: '#6F008A',
   selected: new Set(PRESETS.filter((p) => p.defaultOn).map((p) => p.id)),
   previewShot: 0,
   previewPresetId: PRESETS.find((p) => p.type === 'screenshot').id,
@@ -52,21 +53,39 @@ const els = {
 };
 
 // ---------- بناة الواجهة الديناميكية ----------
-function buildSwatches(container, currentId, onPick) {
+// opts: { currentId(), onPick(id), customColor(), onCustom(hex) }
+function buildSwatches(container, opts) {
   container.innerHTML = '';
+  const active = opts.currentId();
   THEMES.forEach((t) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'swatch' + (t.id === currentId() ? ' is-active' : '');
+    b.className = 'swatch' + (t.id === active ? ' is-active' : '');
     b.title = t.label;
     b.style.background = t.swatch;
     b.addEventListener('click', () => {
-      onPick(t.id);
-      buildSwatches(container, currentId, onPick);
+      opts.onPick(t.id);
+      buildSwatches(container, opts);
       renderPreview();
     });
     container.appendChild(b);
   });
+
+  // لون مخصص (color picker)
+  const label = document.createElement('label');
+  label.className = 'swatch swatch--custom' + (active === 'custom' ? ' is-active' : '');
+  label.title = 'لون مخصص';
+  label.style.background = active === 'custom' ? opts.customColor() : '';
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = opts.customColor();
+  input.addEventListener('input', (e) => {
+    opts.onCustom(e.target.value);
+    buildSwatches(container, opts);
+    renderPreview();
+  });
+  label.appendChild(input);
+  container.appendChild(label);
 }
 
 function buildLayouts() {
@@ -150,8 +169,21 @@ function buildThumbs() {
 function syncControls() {
   const t = activeTarget();
   els.titleInput.value = t.title || '';
-  buildSwatches(els.themeSwatches, () => activeTarget().themeId, (id) => { activeTarget().themeId = id; });
+  buildSwatches(els.themeSwatches, {
+    currentId: () => activeTarget().themeId,
+    onPick: (id) => { activeTarget().themeId = id; },
+    customColor: () => activeTarget().customColor,
+    onCustom: (hex) => { const a = activeTarget(); a.themeId = 'custom'; a.customColor = hex; },
+  });
   buildLayouts();
+}
+
+// يحلّ ثيم الصورة الوصفية (مع دعم اللون المخصص).
+function shotTheme(t) {
+  return t.themeId === 'custom' ? makeCustomTheme(t.customColor) : themeById(t.themeId);
+}
+function iconTheme() {
+  return state.iconThemeId === 'custom' ? makeCustomTheme(state.iconCustomColor) : themeById(state.iconThemeId);
 }
 
 // ---------- المعاينة ----------
@@ -160,7 +192,7 @@ function configFor(preset) {
     const t = activeTarget();
     return {
       title: t.title,
-      theme: themeById(t.themeId),
+      theme: shotTheme(t),
       layoutId: t.layoutId,
       platform: state.platform,
       statusBarRatio: state.statusBarRatio,
@@ -170,7 +202,7 @@ function configFor(preset) {
     };
   }
   // أيقونة / كفر
-  return { theme: themeById(state.iconThemeId), logo: state.logo };
+  return { theme: iconTheme(), logo: state.logo };
 }
 
 async function renderPreview() {
@@ -279,7 +311,7 @@ els.exportBtn.addEventListener('click', async () => {
     const shotsConfig = state.shots.map((s) => ({
       screenshot: s.img,
       title: s.title,
-      theme: themeById(s.themeId),
+      theme: shotTheme(s),
       layoutId: s.layoutId,
     }));
     const globalConfig = {
@@ -288,7 +320,7 @@ els.exportBtn.addEventListener('click', async () => {
       showFrame: state.showFrame,
       logo: state.logo,
     };
-    const iconConfig = { theme: themeById(state.iconThemeId), logo: state.logo };
+    const iconConfig = { theme: iconTheme(), logo: state.logo };
     await exportAll(shotsConfig, [...state.selected], globalConfig, iconConfig, (done, total) => {
       els.progress.hidden = false;
       els.progress.textContent = `جارٍ التصدير… ${done}/${total}`;
@@ -310,7 +342,12 @@ function setBusy(busy) {
 buildPresets();
 buildPreviewPresetOptions();
 buildThumbs();
-buildSwatches(els.iconThemeSwatches, () => state.iconThemeId, (id) => { state.iconThemeId = id; });
+buildSwatches(els.iconThemeSwatches, {
+  currentId: () => state.iconThemeId,
+  onPick: (id) => { state.iconThemeId = id; },
+  customColor: () => state.iconCustomColor,
+  onCustom: (hex) => { state.iconThemeId = 'custom'; state.iconCustomColor = hex; },
+});
 syncControls();
 els.statusBarRange.value = Math.round(state.statusBarRatio * 100);
 els.statusBarVal.textContent = Math.round(state.statusBarRatio * 100) + '%';

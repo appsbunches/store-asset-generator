@@ -47,6 +47,40 @@ export function themeById(id) {
   return THEMES.find((t) => t.id === id) || THEMES[0];
 }
 
+// يبني ثيمًا من لون مخصص يختاره المستخدم، مع حساب لون النص تلقائيًا حسب السطوع.
+export function makeCustomTheme(color, gradient = true) {
+  const text = pickTextColor(color);
+  const bg = gradient ? { type: 'linear', angle: 135, stops: [color, shade(color, -0.18)] } : color;
+  return { id: 'custom', label: 'مخصص', bg, textColor: text, swatch: color };
+}
+
+// أبيض على الخلفية الداكنة، وداكن على الفاتحة.
+export function pickTextColor(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum < 150 ? '#ffffff' : '#1b1424';
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  return {
+    r: parseInt(n.slice(0, 2), 16),
+    g: parseInt(n.slice(2, 4), 16),
+    b: parseInt(n.slice(4, 6), 16),
+  };
+}
+
+// يفتّح/يغمّق لونًا بنسبة amount (موجبة = أفتح، سالبة = أغمق).
+function shade(hex, amount) {
+  const { r, g, b } = hexToRgb(hex);
+  const f = (c) => {
+    const v = amount < 0 ? c * (1 + amount) : c + (255 - c) * amount;
+    return Math.max(0, Math.min(255, Math.round(v)));
+  };
+  return `rgb(${f(r)}, ${f(g)}, ${f(b)})`;
+}
+
 // يبني fillStyle مناسبًا من تعريف الخلفية (لون صلب أو تدرّج) على سياق canvas معيّن.
 export function resolveBackground(ctx, bg, width, height) {
   if (typeof bg === 'string') return bg;

@@ -19,51 +19,50 @@ export function statusBarHeight(w, platform, ratio) {
   return Math.round(w * r);
 }
 
+// حجم محتوى الشريط (الساعة/الأيقونات) ثابت ولا يكبر مع زيادة التغطية —
+// نسبة من عرض الشاشة تعطي مظهرًا واقعيًا كهاتف حقيقي.
+const CONTENT_BASE = { ios: 0.082, android: 0.072 };
+
 export function drawStatusBar(ctx, opts) {
   const { x, y, w, platform = 'ios', tint = 'dark', bgFill = '#ffffff', ratio } = opts;
-  const h = statusBarHeight(w, platform, ratio);
+  const h = statusBarHeight(w, platform, ratio); // ارتفاع التغطية (يغطّي الشريط الأصلي)
   const color = tint === 'light' ? '#ffffff' : '#000000';
 
   ctx.save();
 
-  // تغطية منطقة الشريط الأصلي
+  // تغطية منطقة الشريط الأصلي بالكامل
   ctx.fillStyle = bgFill;
   ctx.fillRect(x, y, w, h);
 
+  // المحتوى بحجم ثابت (مهما زادت التغطية) ويوضع قرب أعلى الشريط كما في الهاتف.
+  const bandH = Math.min(h, w * (CONTENT_BASE[platform] || CONTENT_BASE.ios));
+  const cy = y + bandH / 2 + (h - bandH) * 0.3;
+
   if (platform === 'android') {
-    drawAndroid(ctx, x, y, w, h, color);
+    drawAndroid(ctx, x, w, bandH, cy, color);
   } else {
-    drawIOS(ctx, x, y, w, h, color);
+    drawIOS(ctx, x, w, bandH, cy, color);
   }
 
   ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
-// iOS: الساعة (9:41) على اليسار، النوتش/الجزيرة في الوسط، الأيقونات على اليمين.
-function drawIOS(ctx, x, y, w, h, color) {
-  const padX = w * 0.07;
-  const cy = y + h / 2;
-  const fontSize = Math.round(h * 0.42);
+// iOS: الساعة (9:41) على اليسار، الجزيرة في الوسط، الأيقونات على اليمين.
+// bandH = حجم المحتوى الثابت، cy = المركز الرأسي للصف.
+function drawIOS(ctx, x, w, bandH, cy, color) {
+  const padX = w * 0.06;
+  const fontSize = Math.round(bandH * 0.46);
 
   // الساعة (يسار)
   ctx.fillStyle = color;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.font = `600 ${fontSize}px 'Tajawal', system-ui, sans-serif`;
-  ctx.fillText('9:41', x + padX, cy + fontSize * 0.05);
-
-  // الجزيرة الديناميكية (Dynamic Island) في الوسط
-  const islW = w * 0.28;
-  const islH = h * 0.5;
-  const islX = x + w / 2 - islW / 2;
-  const islY = y + h * 0.18;
-  roundRect(ctx, islX, islY, islW, islH, islH / 2);
-  ctx.fillStyle = '#000000';
-  ctx.fill();
+  ctx.fillText('9:41', x + padX, cy + fontSize * 0.04);
 
   // الأيقونات (يمين): شبكة، واي‑فاي، بطارية
-  const iconH = h * 0.34;
+  const iconH = bandH * 0.32;
   let rightX = x + w - padX;
   rightX = drawBattery(ctx, rightX, cy, iconH, color, true);
   rightX -= iconH * 0.7;
@@ -74,20 +73,19 @@ function drawIOS(ctx, x, y, w, h, color) {
 
 // ---------------------------------------------------------------------------
 // Android: الساعة على اليسار، الأيقونات على اليمين (بأشكال أبسط/مختلفة).
-function drawAndroid(ctx, x, y, w, h, color) {
+function drawAndroid(ctx, x, w, bandH, cy, color) {
   const padX = w * 0.05;
-  const cy = y + h / 2;
-  const fontSize = Math.round(h * 0.5);
+  const fontSize = Math.round(bandH * 0.5);
 
   // الساعة (يسار) — أندرويد يميل لخط أنحف
   ctx.fillStyle = color;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.font = `500 ${fontSize}px 'Tajawal', system-ui, sans-serif`;
-  ctx.fillText('9:41', x + padX, cy + fontSize * 0.05);
+  ctx.fillText('9:41', x + padX, cy + fontSize * 0.04);
 
   // الأيقونات (يمين): شبكة، واي‑فاي، بطارية (نمط أندرويد)
-  const iconH = h * 0.42;
+  const iconH = bandH * 0.4;
   let rightX = x + w - padX;
   rightX = drawAndroidBattery(ctx, rightX, cy, iconH, color);
   rightX -= iconH * 0.55;
