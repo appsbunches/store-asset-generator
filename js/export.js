@@ -1,7 +1,7 @@
 // export.js — يولّد كل الصور المختارة ويجمعها في ملف ZIP واحد.
 // يعتمد على JSZip المحمّل عالميًا (window.JSZip) من lib/jszip.min.js.
 
-import { PRESETS } from './presets.js';
+import { PRESETS, GOOGLE_MAX_BYTES } from './presets.js';
 import { render } from './renderer.js';
 
 // يحوّل الكانفاس إلى Blob بالصيغة المطلوبة. JPEG لا يحمل قناة ألفا إطلاقًا
@@ -14,6 +14,13 @@ function canvasToBlob(canvas, fmt = 'jpeg') {
 
 function extOf(fmt) {
   return fmt === 'png' ? 'png' : 'jpg';
+}
+
+// Google Play يرفض الملفات فوق 8MB — نتحقق قبل إدخالها في الـ ZIP.
+function assertGoogleSize(preset, blob, path) {
+  if (preset.group === 'googleplay' && blob.size > GOOGLE_MAX_BYTES) {
+    throw new Error(`الملف ${path} تجاوز حد Google Play (8MB) — حجمه ${(blob.size / 1024 / 1024).toFixed(1)}MB`);
+  }
 }
 
 // يبني اسم ملف داخل الـ ZIP لكل preset (مع ترقيم السكرينشوتات).
@@ -51,7 +58,9 @@ export async function exportAll(shots, selectedPresetIds, globalConfig, iconConf
     for (const preset of perShot) {
       render(canvas, preset, cfg);
       const blob = await canvasToBlob(canvas, preset.fmt);
-      zip.file(entryPath(preset, i), blob);
+      const path = entryPath(preset, i);
+      assertGoogleSize(preset, blob, path);
+      zip.file(path, blob);
       onProgress && onProgress(++done, total);
       await new Promise((r) => setTimeout(r, 0));
     }
@@ -61,7 +70,9 @@ export async function exportAll(shots, selectedPresetIds, globalConfig, iconConf
   for (const preset of once) {
     render(canvas, preset, iconConfig);
     const blob = await canvasToBlob(canvas, preset.fmt);
-    zip.file(entryPath(preset, 0), blob);
+    const path = entryPath(preset, 0);
+    assertGoogleSize(preset, blob, path);
+    zip.file(path, blob);
     onProgress && onProgress(++done, total);
     await new Promise((r) => setTimeout(r, 0));
   }

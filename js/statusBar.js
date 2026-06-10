@@ -49,18 +49,11 @@ export function drawStatusBar(ctx, opts) {
 }
 
 // ---------------------------------------------------------------------------
-// iOS: الساعة (9:41) على اليسار، الجزيرة في الوسط، الأيقونات على اليمين.
-// bandH = حجم المحتوى الثابت، cy = المركز الرأسي للصف.
+// iOS — يحاكي شريط حالة آبل الفعلي (iPhone بجزيرة ديناميكية):
+// الساعة (9:41) بخط النظام في منتصف "الأذن" اليسرى، الجزيرة في الوسط،
+// والأيقونات (شبكة، واي‑فاي، بطارية) في منتصف الأذن اليمنى.
 function drawIOS(ctx, x, w, bandH, cy, color) {
-  const padX = w * 0.06;
-  const fontSize = Math.round(bandH * 0.46);
-
-  // الساعة (يسار)
-  ctx.fillStyle = color;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  ctx.font = `600 ${fontSize}px 'Tajawal', system-ui, sans-serif`;
-  ctx.fillText('9:41', x + padX, cy + fontSize * 0.04);
+  const fontSize = Math.round(bandH * 0.5);
 
   // الجزيرة الديناميكية (Dynamic Island) في الوسط — بحجم ثابت
   const islW = w * 0.3;
@@ -69,37 +62,56 @@ function drawIOS(ctx, x, w, bandH, cy, color) {
   ctx.fillStyle = '#000000';
   ctx.fill();
 
-  // الأيقونات (يمين): شبكة، واي‑فاي، بطارية
+  const earW = (w - islW) / 2; // عرض المنطقة على جانبي الجزيرة
+
+  // الساعة في منتصف الأذن اليسرى — بخط النظام (SF على آبل) وليس Tajawal
+  ctx.fillStyle = color;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.font = `600 ${fontSize}px -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif`;
+  ctx.fillText('9:41', x + earW * 0.5, cy + fontSize * 0.04);
+
+  // الأيقونات موسّطة في الأذن اليمنى: شبكة ← واي‑فاي ← بطارية
   const iconH = bandH * 0.32;
-  let rightX = x + w - padX;
-  rightX = drawBattery(ctx, rightX, cy, iconH, color, true);
-  rightX -= iconH * 0.7;
-  rightX = drawWifi(ctx, rightX, cy, iconH, color);
-  rightX -= iconH * 0.55;
+  const gap1 = iconH * 0.55; // بين الشبكة والواي‑فاي
+  const gap2 = iconH * 0.5;  // بين الواي‑فاي والبطارية
+  const signalW = iconH * 0.22 * 4 + iconH * 0.22 * 0.55 * 3;
+  const wifiW = iconH * 1.25;
+  const battW = iconH * 2.0 + iconH * 0.18;
+  const iconsW = signalW + gap1 + wifiW + gap2 + battW;
+
+  let rightX = x + w - earW * 0.5 + iconsW / 2;
+  rightX = Math.min(rightX, x + w - w * 0.03);
+  rightX = drawBattery(ctx, rightX, cy, iconH, color);
+  rightX -= gap2;
+  rightX = drawWifi(ctx, rightX, cy, iconH, color, false);
+  rightX -= gap1;
   drawSignalBars(ctx, rightX, cy, iconH, color);
 }
 
 // ---------------------------------------------------------------------------
-// Android: الساعة على اليسار، الأيقونات على اليمين (بأشكال أبسط/مختلفة).
+// Android — نمط Pixel الحديث: الساعة على اليسار، وعلى اليمين بالترتيب
+// (من اليسار لليمين): واي‑فاي، شبكة، بطارية. الساعة 12:00 مطابقة لوضع
+// demo mode الذي يثبّته pipeline الالتقاط (adb demo clock 1200).
 function drawAndroid(ctx, x, w, bandH, cy, color) {
   const padX = w * 0.05;
   const fontSize = Math.round(bandH * 0.5);
 
-  // الساعة (يسار) — أندرويد يميل لخط أنحف
+  // الساعة (يسار) — Roboto خط نظام أندرويد
   ctx.fillStyle = color;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.font = `500 ${fontSize}px 'Tajawal', system-ui, sans-serif`;
-  ctx.fillText('9:41', x + padX, cy + fontSize * 0.04);
+  ctx.font = `500 ${fontSize}px Roboto, 'Helvetica Neue', system-ui, Arial, sans-serif`;
+  ctx.fillText('12:00', x + padX, cy + fontSize * 0.04);
 
-  // الأيقونات (يمين): شبكة، واي‑فاي، بطارية (نمط أندرويد)
+  // الأيقونات (يمين): البطارية أقصى اليمين، ثم مثلث الشبكة، ثم الواي‑فاي
   const iconH = bandH * 0.4;
   let rightX = x + w - padX;
   rightX = drawAndroidBattery(ctx, rightX, cy, iconH, color);
-  rightX -= iconH * 0.55;
-  rightX = drawWifi(ctx, rightX, cy, iconH, color);
   rightX -= iconH * 0.5;
-  drawSignalTriangle(ctx, rightX, cy, iconH, color);
+  rightX = drawSignalTriangle(ctx, rightX, cy, iconH, color);
+  rightX -= iconH * 0.5;
+  drawWifi(ctx, rightX, cy, iconH, color, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,14 +147,14 @@ function drawSignalTriangle(ctx, rightX, cy, h, color) {
   return left;
 }
 
-// قوس واي‑فاي (مشترك بين المنصّتين بتقريب بسيط)
-function drawWifi(ctx, rightX, cy, h, color) {
+// قوس واي‑فاي. آبل: ثلاثة أقواس فقط. أندرويد: أقواس + نقطة سفلية.
+function drawWifi(ctx, rightX, cy, h, color, withDot) {
   const w = h * 1.25;
   const cx = rightX - w / 2;
   const baseY = cy + h / 2;
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(1, h * 0.12);
+  ctx.lineWidth = Math.max(1, h * 0.16);
   ctx.lineCap = 'round';
   const arcs = [0.95, 0.62, 0.3];
   arcs.forEach((r) => {
@@ -150,34 +162,34 @@ function drawWifi(ctx, rightX, cy, h, color) {
     ctx.arc(cx, baseY, (w / 2) * r, Math.PI * 1.2, Math.PI * 1.8);
     ctx.stroke();
   });
-  // النقطة
-  ctx.beginPath();
-  ctx.arc(cx, baseY - h * 0.05, h * 0.08, 0, Math.PI * 2);
-  ctx.fill();
+  if (withDot) {
+    ctx.beginPath();
+    ctx.arc(cx, baseY - h * 0.05, h * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
   return rightX - w;
 }
 
-// بطارية iOS (مستطيل بزوايا + طرف صغير + تعبئة)
+// بطارية iOS كما يرسمها النظام: إطار بشفافية ~40% + طرف صغير بنفس الشفافية
+// + تعبئة داخلية صلبة كاملة (batteryLevel 100 كما يثبّتها simctl في الالتقاط).
 function drawBattery(ctx, rightX, cy, h, color) {
   const bw = h * 2.0;
   const bh = h;
   const left = rightX - bw - h * 0.18;
   const top = cy - bh / 2;
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.65;
+  ctx.globalAlpha = 0.4;
   ctx.lineWidth = Math.max(1, h * 0.1);
-  roundRect(ctx, left, top, bw, bh, bh * 0.28);
+  roundRect(ctx, left, top, bw, bh, bh * 0.32);
   ctx.stroke();
-  ctx.globalAlpha = 1;
-  // الطرف
+  // الطرف (نتوء صغير على يمين الإطار)
   ctx.fillStyle = color;
-  ctx.globalAlpha = 0.65;
-  roundRect(ctx, rightX - h * 0.16, cy - bh * 0.18, h * 0.16, bh * 0.36, h * 0.08);
+  roundRect(ctx, rightX - h * 0.16, cy - bh * 0.17, h * 0.14, bh * 0.34, h * 0.07);
   ctx.fill();
   ctx.globalAlpha = 1;
-  // التعبئة
-  const pad = bh * 0.16;
-  roundRect(ctx, left + pad, top + pad, bw - pad * 2, bh - pad * 2, bh * 0.16);
+  // التعبئة الصلبة (ممتلئة 100%)
+  const pad = bh * 0.18;
+  roundRect(ctx, left + pad, top + pad, bw - pad * 2, bh - pad * 2, bh * 0.18);
   ctx.fill();
   return left;
 }

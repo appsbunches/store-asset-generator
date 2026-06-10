@@ -11,11 +11,12 @@ export function renderScreenshot(ctx, preset, config, helpers) {
   const {
     screenshot, title, theme, platform = 'ios', showFrame = true,
     logo = null, statusBarRatio, layoutId = 'classic', showHeaderLogo = false,
+    bgStyleId = 'gradient',
   } = config;
   const layout = layoutById(layoutId);
 
-  // 1) الخلفية + النقش الزخرفي
-  helpers.paintBackground(ctx, theme, width, height);
+  // 1) الخلفية (حسب النمط المختار) + النقش الزخرفي
+  helpers.paintBackground(ctx, theme, width, height, bgStyleId);
   drawPattern(ctx, layout, theme, width, height);
 
   // 2) منطقة العنوان (وربما الشعار) أعلى الصورة

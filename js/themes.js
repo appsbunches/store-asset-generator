@@ -72,7 +72,7 @@ function hexToRgb(hex) {
 }
 
 // يفتّح/يغمّق لونًا بنسبة amount (موجبة = أفتح، سالبة = أغمق).
-function shade(hex, amount) {
+export function shade(hex, amount) {
   const { r, g, b } = hexToRgb(hex);
   const f = (c) => {
     const v = amount < 0 ? c * (1 + amount) : c + (255 - c) * amount;

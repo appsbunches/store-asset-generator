@@ -40,6 +40,20 @@
         </div>
       </div>
 
+      <!-- استيراد/تصدير إعداد التاجر (نفس صيغة merchants/<id>.json في appshot-capture) -->
+      <div class="field">
+        <span class="field__label">إعداد التاجر</span>
+        <input type="file" id="merchantConfigInput" accept="application/json,.json" hidden />
+        <button type="button" id="importConfigBtn" class="button button--ghost">استيراد إعداد تاجر (JSON)</button>
+        <button type="button" id="exportConfigBtn" class="button button--ghost">تصدير الإعدادات الحالية</button>
+        <small class="field__hint">نفس ملف merchants/&lt;id&gt;.json المستخدم في pipeline الالتقاط.</small>
+        <div class="preset-row">
+          <select id="presetSelect"><option value="">— الإعدادات المحفوظة —</option></select>
+          <button type="button" id="savePresetBtn" class="button button--ghost button--sm" title="حفظ الإعدادات الحالية باسم">حفظ</button>
+          <button type="button" id="deletePresetBtn" class="button button--ghost button--sm" title="حذف المحدد">حذف</button>
+        </div>
+      </div>
+
       <!-- رفع السكرينشوتات -->
       <label class="field">
         <span class="field__label">سكرينشوتات التطبيق</span>
@@ -84,6 +98,13 @@
         <div class="swatches" id="themeSwatches"></div>
       </div>
 
+      <!-- نمط الخلفية -->
+      <div class="field">
+        <span class="field__label">نمط الخلفية</span>
+        <div class="chips" id="bgStyleChips"></div>
+        <small class="field__hint">أشكال مشتقة من لون الخلفية المختار — يمكن تغييرها لكل صورة.</small>
+      </div>
+
       <!-- إعدادات عامة للدفعة -->
       <div class="section-head">إعدادات عامة</div>
 
@@ -105,6 +126,10 @@
         <span class="field__label">اللوجو (للأيقونة والكفر والشعار العلوي)</span>
         <input type="file" id="logoInput" accept="image/png,image/svg+xml,image/*" />
         <small class="field__hint">يفضّل PNG شفاف. يُستبدل شعار المتجر المجلوب إن رفعت لوجو.</small>
+        <div id="logoPreviewRow" class="logo-preview" hidden>
+          <img id="logoPreview" alt="الشعار الحالي" />
+          <span>الشعار الحالي (محفوظ بين الجلسات)</span>
+        </div>
       </label>
 
       <!-- إظهار الشعار أعلى كل الصفحات -->

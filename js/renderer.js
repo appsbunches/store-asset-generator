@@ -1,6 +1,7 @@
 // renderer.js — القلب التقني: أدوات مساعدة + موزّع الرسم حسب نوع الـ preset.
 
 import { resolveBackground } from './themes.js';
+import { paintBackgroundStyle } from './backgrounds.js';
 import { renderScreenshot } from './templates/screenshot.js';
 import { renderIcon } from './templates/icon.js';
 import { renderFeature } from './templates/feature.js';
@@ -81,8 +82,13 @@ export function topBackgroundColor(img) {
   }
 }
 
-// رسم خلفية الثيم على كامل الكانفاس.
-export function paintBackground(ctx, theme, width, height) {
+// رسم خلفية الثيم على كامل الكانفاس. styleId اختياري (أنماط backgrounds.js)؛
+// بدونه يُرسم تدرّج/لون الثيم كما هو (الأيقونات والكفر).
+export function paintBackground(ctx, theme, width, height, styleId) {
+  if (styleId) {
+    paintBackgroundStyle(ctx, theme, width, height, styleId);
+    return;
+  }
   ctx.fillStyle = resolveBackground(ctx, theme.bg, width, height);
   ctx.fillRect(0, 0, width, height);
 }
@@ -126,6 +132,10 @@ export function render(canvas, preset, config) {
   canvas.width = preset.width;
   canvas.height = preset.height;
   const ctx = canvas.getContext('2d');
+  // أعلى جودة تنعيم عند تصغير السكرينشوت داخل إطار الجوال —
+  // الافتراضي 'low' يسبب فقدان حدة واضحًا في المخرجات النهائية.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const helpers = { paintBackground, drawTitle, detectTopTint, topBackgroundColor };
